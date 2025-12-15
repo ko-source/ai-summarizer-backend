@@ -11,13 +11,7 @@ import {
 import { SummariesService } from './summaries.service';
 import { CreateSummaryDto } from './dto/create-summary.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-
-interface RequestWithUser extends Request {
-  user: {
-    id: number;
-    email: string;
-  };
-}
+import { User } from 'src/users/users.entity';
 
 @Controller('summaries')
 @UseGuards(JwtAuthGuard)
@@ -27,21 +21,21 @@ export class SummariesController {
   @Post()
   async create(
     @Body() createSummaryDto: CreateSummaryDto,
-    @Request() req: RequestWithUser,
+    @Request() req: Partial<User>,
   ) {
-    return this.summariesService.create(req.user.id, createSummaryDto);
+    return this.summariesService.create(req.id!, createSummaryDto);
   }
 
   @Get()
-  async findAll(@Request() req: RequestWithUser) {
-    return this.summariesService.findAllByUserId(req.user.id);
+  async findAll(@Request() req: Partial<User>) {
+    return this.summariesService.findAllByUserId(req.id!);
   }
 
   @Get(':id')
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: RequestWithUser,
+    @Request() req: Partial<User>,
   ) {
-    return this.summariesService.findOne(id, req.user.id);
+    return this.summariesService.findOne(id, req.id!);
   }
 }

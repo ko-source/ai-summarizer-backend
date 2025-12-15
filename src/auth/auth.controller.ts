@@ -11,13 +11,7 @@ import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersService } from 'src/users/users.service';
-
-interface RequestWithUser extends Request {
-  user: {
-    id: number;
-    email: string;
-  };
-}
+import { User } from 'src/users/users.entity';
 
 @Controller('auth')
 export class AuthController {
@@ -38,9 +32,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getProfile(@Request() req: RequestWithUser): Promise<unknown> {
-    const userId: number = req.user.id;
-    const result: unknown = await this.usersService.findById(userId);
-    return result;
+  async getProfile(@Request() req: Partial<User>): Promise<User | null> {
+    return await this.usersService.findById(req.id!);
   }
 }

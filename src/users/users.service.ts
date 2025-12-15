@@ -14,10 +14,10 @@ export class UsersService {
     return this.usersRepository.findOne({ where: { email } });
   }
 
-  async findById(id: number): Promise<any> {
+  async findById(id: number): Promise<User | null> {
     const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) return null;
-    delete (user as unknown as { password?: string })?.password;
+    delete (user as { password?: string })?.password;
     return user;
   }
 
