@@ -12,6 +12,7 @@ import { SignupDto } from './dto/signup.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/users.entity';
+import { Request as ExpressRequest } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -32,7 +33,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getProfile(@Request() req: Partial<User>): Promise<User | null> {
-    return await this.usersService.findById(req.id!);
+  async getProfile(@Request() req: ExpressRequest & { user: User }) {
+    return await this.usersService.findById(req.user.id);
   }
 }

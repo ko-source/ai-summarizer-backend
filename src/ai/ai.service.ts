@@ -21,7 +21,7 @@ export class AiService {
       this.logger.warn('GEMINI_API_KEY not found in environment variables');
     }
     this.apiUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+      'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent';
   }
 
   async summarize(text: string): Promise<SummaryResult> {
