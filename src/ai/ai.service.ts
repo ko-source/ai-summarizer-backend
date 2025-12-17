@@ -1,174 +1,65 @@
-import { Injectable, Logger } from '@nestjs/common';
-import axios, { AxiosError, AxiosResponse } from 'axios';
+import { Injectable } from '@nestjs/common';
+import axios, { AxiosResponse } from 'axios';
 import { getSummarizePrompt } from './prompts/summarize.prompt';
-
-export interface SummaryResult {
-  summary: string;
-  actionItems: string[];
-  risks: string[];
-  nextSteps: string[];
-}
+import { GeminiApiResponse, SummaryData } from '../interfaces/ai-interfaces';
 
 @Injectable()
 export class AiService {
-  private readonly logger = new Logger(AiService.name);
-  private readonly apiKey: string;
-  private readonly apiUrl: string;
+  private readonly apiKey = process.env.GEMINI_API_KEY as string;
+  private readonly apiUrl =
+    'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent';
 
-  constructor() {
-    this.apiKey = process.env.GEMINI_API_KEY as string;
-    if (!this.apiKey) {
-      this.logger.warn('GEMINI_API_KEY not found in environment variables');
-    }
-    this.apiUrl =
-      'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent';
-  }
+  async summarize(text: string): Promise<SummaryData> {
+    const response: AxiosResponse<GeminiApiResponse> = await axios.post(
+      `${this.apiUrl}?key=${this.apiKey}`,
+      { contents: [{ parts: [{ text: getSummarizePrompt(text) }] }] },
+      { timeout: 30000, headers: { 'Content-Type': 'application/json' } },
+    );
 
-  async summarize(text: string): Promise<SummaryResult> {
-    if (!this.apiKey) {
-      throw new Error('AI API key not configured');
-    }
+    const textContent =
+      response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const content = typeof textContent === 'string' ? textContent.trim() : '';
 
-    const prompt = getSummarizePrompt(text);
-
-    try {
-      const response = await axios.post(
-        `${this.apiUrl}?key=${this.apiKey}`,
-        {
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        },
-        {
-          timeout: 30000,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-
-      const content = this.extractContent(
-        response as AxiosResponse<{
-          candidates?: Array<{
-            content?: {
-              parts?: Array<{ text?: string }>;
-            };
-          }>;
-        }>,
-      );
-      return this.parseResponse(content);
-    } catch (error) {
-      this.handleError(error);
-      throw new Error('Failed to generate summary. Please try again.');
-    }
-  }
-
-  private extractContent(
-    response: AxiosResponse<{
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{ text?: string }>;
-        };
-      }>;
-    }>,
-  ): string {
-    if (!response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid response structure from AI service');
-    }
-
-    const text = response.data.candidates[0].content.parts[0].text;
-    if (!text) {
-      throw new Error('Invalid response structure from AI service');
-    }
-    return text.trim();
-  }
-
-  private parseResponse(content: string): SummaryResult {
-    const jsonString = this.extractJsonString(content);
-
-    try {
-      const parsed: unknown = JSON.parse(jsonString);
-      return this.validateAndFormat(parsed);
-    } catch (error) {
-      this.logger.error('Failed to parse AI response', error);
-      return this.createFallbackResponse(content);
-    }
-  }
-
-  private extractJsonString(content: string): string {
-    let jsonString = content;
-
-    jsonString = jsonString
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
+    const cleanedContent = content
+      .replace(/```json?\n?/g, '')
+      .replace(/```/g, '')
       .trim();
 
-    const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      jsonString = jsonMatch[0];
+    const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
+    const jsonToParse =
+      jsonMatch && jsonMatch[0] ? jsonMatch[0] : cleanedContent;
+
+    let parsed: SummaryData = {};
+    try {
+      const parsedValue: unknown = JSON.parse(jsonToParse);
+      if (
+        typeof parsedValue === 'object' &&
+        parsedValue !== null &&
+        !Array.isArray(parsedValue)
+      ) {
+        parsed = parsedValue;
+      }
+    } catch {
+      parsed = {};
     }
 
-    return jsonString;
-  }
-
-  private validateAndFormat(parsed: unknown): SummaryResult {
-    const parsedObj = parsed as {
-      summary?: unknown;
-      actionItems?: unknown;
-      risks?: unknown;
-      nextSteps?: unknown;
-    };
     return {
-      summary: this.ensureString(parsedObj.summary, 'No summary available'),
-      actionItems: this.ensureArray(parsedObj.actionItems),
-      risks: this.ensureArray(parsedObj.risks),
-      nextSteps: this.ensureArray(parsedObj.nextSteps),
+      summary:
+        typeof parsed.summary === 'string' && parsed.summary.trim()
+          ? parsed.summary.trim()
+          : content.substring(0, 200) || 'No summary available',
+      actionItems: this.parseStringArray(parsed.actionItems),
+      risks: this.parseStringArray(parsed.risks),
+      nextSteps: this.parseStringArray(parsed.nextSteps),
     };
   }
 
-  private ensureString(value: unknown, fallback: string): string {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
+  private parseStringArray(value: string[] | undefined): string[] {
+    if (!Array.isArray(value)) {
+      return [];
     }
-    return fallback;
-  }
-
-  private ensureArray(value: unknown): string[] {
-    if (Array.isArray(value)) {
-      return value
-        .filter(
-          (item): item is string =>
-            typeof item === 'string' && item.trim() !== '',
-        )
-        .map((item) => item.trim());
-    }
-    return [];
-  }
-
-  private createFallbackResponse(content: string): SummaryResult {
-    return {
-      summary: content.substring(0, 200) || 'Summary generation failed',
-      actionItems: [],
-      risks: [],
-      nextSteps: [],
-    };
-  }
-
-  private handleError(error: unknown): void {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError;
-      this.logger.error(
-        `AI API Error: ${axiosError.message}`,
-        axiosError.response?.data,
-      );
-    } else {
-      this.logger.error('Unexpected error in AI service', error);
-    }
+    return value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim());
   }
 }
