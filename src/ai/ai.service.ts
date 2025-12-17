@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import axios, { AxiosResponse } from 'axios';
 import { getSummarizePrompt } from './prompts/summarize.prompt';
-import { GeminiApiResponse, SummaryData } from '../interfaces/ai-interfaces';
-import { parseStringArray } from '../utils/ai-helper';
+import {
+  GeminiApiResponse,
+  SummaryData,
+} from '../common/interfaces/ai-interfaces';
+import { parseStringArray } from '../common/utils/ai-helper';
 
 @Injectable()
 export class AiService {
