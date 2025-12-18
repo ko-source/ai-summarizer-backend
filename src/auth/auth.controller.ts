@@ -9,7 +9,7 @@ import {
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/users.entity';
 import { Request as ExpressRequest } from 'express';

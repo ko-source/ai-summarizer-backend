@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { SummariesService } from './summaries.service';
 import { CreateSummaryDto } from './dto/create-summary.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { User } from 'src/users/users.entity';
 import { Request as ExpressRequest } from 'express';
 @Controller('summaries')
