@@ -7,6 +7,7 @@ import { typeOrmConfig } from './database/typeorm.config';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { SummariesModule } from './summaries/summaries.module';
+import { ResumesModule } from './resumes/resumes.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SummariesModule } from './summaries/summaries.module';
     UsersModule,
     AuthModule,
     SummariesModule,
+    ResumesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
