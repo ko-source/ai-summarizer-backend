@@ -17,6 +17,8 @@ export class LlamaExtractService {
   private readonly baseUrl = 'https://api.cloud.llamaindex.ai/api/v1';
   private readonly axiosInstance: AxiosInstance;
   private readonly agentName = 'resume_extractor';
+  private readonly maxPollAttempts = 30;
+  private readonly pollDelayMs = 2000;
 
   constructor() {
     this.axiosInstance = axios.create({
@@ -29,44 +31,33 @@ export class LlamaExtractService {
     });
   }
 
-  async getOrCreateAgent(projectId?: string): Promise<string> {
+  async getOrCreateAgent(): Promise<string> {
     try {
-      const getAgentUrl = projectId
-        ? `/extraction/extraction-agents/by-name/${this.agentName}?project_id=${projectId}`
-        : `/extraction/extraction-agents/by-name/${this.agentName}`;
-
-      try {
-        const response = await this.axiosInstance.get<ExtractionAgent>(
-          getAgentUrl,
-        );
-        this.logger.log(`Found existing agent: ${response.data.id}`);
-        return response.data.id;
-      } catch (error) {
-        this.logger.log('Agent not found, creating new agent...');
-      }
-
-      const agentData = {
-        name: this.agentName,
-        data_schema: this.getResumeSchema(),
-        config: {
-          extraction_target: 'PER_DOC',
-          extraction_mode: 'BALANCED',
-        },
-      };
-
-      const createUrl = projectId
-        ? `/extraction/extraction-agents?project_id=${projectId}`
-        : '/extraction/extraction-agents';
-
-      const response = await this.axiosInstance.post<ExtractionAgent>(
-        createUrl,
-        agentData,
+      const response = await this.axiosInstance.get<ExtractionAgent>(
+        `/extraction/extraction-agents/by-name/${this.agentName}`,
       );
+      this.logger.log(`Found existing agent: ${response.data.id}`);
+      return response.data.id;
+    } catch (error) {
+      this.logger.log('Agent not found, creating new agent...');
+    }
 
+    try {
+      const response = await this.axiosInstance.post<ExtractionAgent>(
+        '/extraction/extraction-agents',
+        {
+          name: this.agentName,
+          data_schema: this.getResumeSchema(),
+          config: {
+            extraction_target: 'PER_DOC',
+            extraction_mode: 'BALANCED',
+          },
+        },
+      );
       this.logger.log(`Created new agent: ${response.data.id}`);
       return response.data.id;
     } catch (error) {
-      this.logger.error('Error getting/creating agent:', error);
+      this.logger.error('Error creating agent:', error);
       throw new Error('Failed to get or create extraction agent');
     }
   }
@@ -119,15 +110,11 @@ export class LlamaExtractService {
   }
 
   async pollJobStatus(jobId: string): Promise<ExtractionJob> {
-    const maxAttempts = 30;
-    const delayMs = 2000; // 2 seconds
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    for (let attempt = 0; attempt < this.maxPollAttempts; attempt++) {
       try {
         const response = await this.axiosInstance.get<ExtractionJob>(
           `/extraction/jobs/${jobId}`,
         );
-
         const job = response.data;
 
         if (job.status === 'SUCCESS') {
@@ -140,15 +127,15 @@ export class LlamaExtractService {
         }
 
         this.logger.log(
-          `Job ${jobId} status: ${job.status}, attempt ${attempt + 1}/${maxAttempts}`,
+          `Job ${jobId} status: ${job.status}, attempt ${attempt + 1}/${this.maxPollAttempts}`,
         );
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await new Promise((resolve) => setTimeout(resolve, this.pollDelayMs));
       } catch (error) {
         if (error instanceof Error && error.message === 'Extraction job failed') {
           throw error;
         }
         this.logger.error(`Error polling job status: ${error}`);
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await new Promise((resolve) => setTimeout(resolve, this.pollDelayMs));
       }
     }
 
