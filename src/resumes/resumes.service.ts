@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Resume } from './resumes.entity';
@@ -57,9 +61,9 @@ export class ResumesService {
 
       return this.resumesRepository.save(resume);
     } catch (error) {
-      throw new Error(
-        `Failed to extract resume: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const message =
+        error instanceof Error ? error.message : 'Unknown error during resume extraction';
+      throw new InternalServerErrorException(`Failed to extract resume: ${message}`);
     }
   }
 
